@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_portal_url" translatable="false">https://www.arcgis.com</string>
+    <string name="pref_viewshed_dist" translatable="false">pref_viewshed_dist</string>
+    <integer name="setting_initial_viewshed_dist_m">200</integer>
+    <integer name="geoanalysis_observer_height_m">2</integer>
+    <string name="dlg_title_portal_url">Введите URL:</string>
+    <string name="msg_invalid_portal_url">Неверный URL.</string>
+    <string name="err_portal_user_problem">У вас нет разрешений на доступ к этому ресурсу.</string>
+    <string name="dlg_title_choose_webscene">Выберете веб-сцену:</string>
+    <string name="msg_no_webscenes">У этого пользователя нет веб-сцен.</string>
+</resources>

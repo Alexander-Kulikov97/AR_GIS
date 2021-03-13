@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Display scene in tabletop AR</string>
+    <string name="philadelphia_mobile_scene_package_path">/ArcGIS/Samples/ScenePackage/philadelphia.mspk</string>
+    <string name="camera_instruction_message">Перемещайте камеру вперед и назад. Когда когда поверхность будет обнаружена, нажмите на поверхность, чтобы разместить сцену</string>
+    <string name="not_plane_error">ArCore doesn\'t recognize this point as a plane.</string>
+    <string name="tabletop_map_permission_denied">Camera and read external storage permissions are both required for this app to run!</string>
+    <string name="tb_btn_layers">Слои</string>
+    <string name="unnamed_layer">[unnamed layer]</string>
+</resources>

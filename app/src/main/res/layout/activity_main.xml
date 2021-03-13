@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="#efefef"
+    tools:context=".MainActivity">
+
+
+    <com.esri.arcgisruntime.toolkit.ar.ArcGISArView
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/arView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".MainActivity" />
+
+
+    <com.github.clans.fab.FloatingActionMenu
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/floatingActionMenu"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_gravity="bottom|end"
+        android:layout_alignParentRight="true"
+        android:layout_marginEnd="15dp"
+        android:layout_marginBottom="50dp"
+        app:menu_backgroundColor="@android:color/transparent"
+        app:menu_fab_label=""
+        app:menu_openDirection="up"
+        app:menu_showShadow="true"
+        >
+
+<!--        <com.github.clans.fab.FloatingActionButton-->
+<!--            android:id="@+id/floatingActionBookmarks"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            app:fab_label="Закладки"-->
+<!--            app:fab_size="mini"-->
+<!--            android:src="@drawable/bookmarks"-->
+<!--            />-->
+<!--        <com.github.clans.fab.FloatingActionButton-->
+<!--            android:id="@+id/floatingActionGpsLoc"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            app:fab_label="GPS"-->
+<!--            app:fab_size="mini"-->
+<!--            android:src="@drawable/gps_fixed"-->
+<!--            app:showAsAction="ifRoom"/>-->
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/floatingActionTapSensorNavigation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Стол AR"
+            app:fab_size="mini"
+            android:src="@drawable/sensor_navigation"
+            />
+
+<!--        <com.github.clans.fab.FloatingActionButton-->
+<!--            android:id="@+id/floatingActionTapStandardNavigation"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            app:fab_label="Стандартная навигация"-->
+<!--            app:fab_size="mini"-->
+<!--            android:src="@drawable/ic_touch_action"-->
+<!--            />-->
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/floatingActionLayers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Слои"
+            app:fab_size="mini"
+            android:src="@drawable/ic_layers_white"
+            />
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/floatingActionOpen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Открыть"
+            app:fab_size="mini"
+            android:src="@drawable/folder_open"
+            />
+
+    </com.github.clans.fab.FloatingActionMenu>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
