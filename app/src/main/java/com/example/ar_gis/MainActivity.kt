@@ -1,11 +1,13 @@
 package com.example.ar_gis
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.DialogInterface.OnMultiChoiceClickListener
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.text.InputType
@@ -25,18 +27,18 @@ import com.esri.arcgisruntime.geometry.*
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.loadable.LoadStatus
 import com.esri.arcgisruntime.loadable.LoadStatusChangedListener
-import com.esri.arcgisruntime.mapping.ArcGISScene
-import com.esri.arcgisruntime.mapping.LayerList
-import com.esri.arcgisruntime.mapping.MobileScenePackage
-import com.esri.arcgisruntime.mapping.NavigationConstraint
-import com.esri.arcgisruntime.mapping.view.Camera
-import com.esri.arcgisruntime.mapping.view.DefaultSceneViewOnTouchListener
+import com.esri.arcgisruntime.location.LocationDataSource
+import com.esri.arcgisruntime.mapping.*
+import com.esri.arcgisruntime.mapping.view.*
 import com.esri.arcgisruntime.portal.Portal
 import com.esri.arcgisruntime.portal.PortalItem
 import com.esri.arcgisruntime.portal.PortalUser
 import com.esri.arcgisruntime.portal.PortalUserContent
 import com.esri.arcgisruntime.security.AuthenticationManager
 import com.esri.arcgisruntime.security.DefaultAuthenticationChallengeHandler
+import com.esri.arcgisruntime.symbology.SceneSymbol
+import com.esri.arcgisruntime.symbology.SimpleMarkerSceneSymbol
+import com.esri.arcgisruntime.toolkit.ar.ArLocationDataSource
 import com.esri.arcgisruntime.toolkit.ar.ArcGISArView
 import com.example.ar_gis.utility.PortalAGOL
 import com.github.clans.fab.FloatingActionButton
@@ -67,7 +69,7 @@ class MainActivity : AppCompatActivity() {
 
     private val ActionGpsLoc: FloatingActionButton? = null
     private var ActionTapSensorNavigation:FloatingActionButton? = null
-    private var ActionTapStandardNavigation:FloatingActionButton? = null
+    private var ActionTapArTerritory:FloatingActionButton? = null
     private var ActionLayers:FloatingActionButton? = null
     private var ActionOpen:FloatingActionButton? = null
     private var ActionBookmarks:FloatingActionButton? = null
@@ -82,10 +84,12 @@ class MainActivity : AppCompatActivity() {
         ActionOpen = findViewById(R.id.floatingActionOpen) as FloatingActionButton
         ActionTapSensorNavigation= findViewById(R.id.floatingActionTapSensorNavigation) as FloatingActionButton
         ActionLayers = findViewById(R.id.floatingActionLayers) as FloatingActionButton
+        ActionTapArTerritory = findViewById(R.id.floatingActionTapArTerritory) as FloatingActionButton
 
         ActionOpen!!.setOnClickListener { AuthAgol() }
         ActionTapSensorNavigation!!.setOnClickListener { setupArView() }
         ActionLayers!!.setOnClickListener { showLayers() }
+        ActionTapArTerritory!!.setOnClickListener { setupTerritoryArView() }
 
     }
     
@@ -190,6 +194,62 @@ class MainActivity : AppCompatActivity() {
                     mPortal!!.loadAsync()
                 })
             .show()
+    }
+
+    private fun setupTerritoryArView(){
+        mArView?.sceneView?.setOnTouchListener(object :
+            DefaultSceneViewOnTouchListener(mArView?.sceneView) {
+            @SuppressLint("ClickableViewAccessibility")
+            override fun onSingleTapConfirmed(motionEvent: MotionEvent?): Boolean {
+                motionEvent?.let {
+                    with(android.graphics.Point(motionEvent.x.toInt(), motionEvent.y.toInt())) {
+                    val sphere = SimpleMarkerSceneSymbol.createSphere(
+                        Color.CYAN,
+                        0.25,
+                        SceneSymbol.AnchorPosition.BOTTOM)
+                        mArView?.arSceneView?.arFrame
+                        addElevationSource(mArView?.sceneView?.scene)
+
+                        mArView?.locationDataSource = locationDataSource
+                        mArView?.translationFactor = 1.0
+                        mArView?.clippingDistance = 1000.0
+
+                        mArView?.arScreenToLocation(this)?.let {
+                            val graphic = Graphic(it, sphere)
+                            sphereOverlay.graphics.add(graphic)
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+    }
+
+    private val locationDataSource: LocationDataSource get() = ArLocationDataSource(this)
+
+    private val sphereOverlay: GraphicsOverlay by lazy {
+        GraphicsOverlay().apply {
+            this.sceneProperties.surfacePlacement =
+                LayerSceneProperties.SurfacePlacement.ABSOLUTE
+            mArView?.sceneView?.graphicsOverlays?.add(this)
+        }
+    }
+
+    private fun addElevationSource(scene: ArcGISScene?) {
+        if(scene == null){
+            return
+        }
+        val elevationSource =
+            ArcGISTiledElevationSource("https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer")
+        val surface = Surface()
+        surface.elevationSources.add(elevationSource)
+        surface.name = "baseSurface"
+        surface.isEnabled = true
+        surface.backgroundGrid.color = Color.TRANSPARENT
+        surface.backgroundGrid.gridLineColor = Color.TRANSPARENT
+        surface.navigationConstraint = NavigationConstraint.NONE
+        scene.baseSurface = surface
     }
 
     private fun setupArView() {
