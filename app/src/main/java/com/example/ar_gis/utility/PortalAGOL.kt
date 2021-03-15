@@ -70,7 +70,7 @@ class PortalAGOL() {
 
             val onWebsceneChosen = DialogInterface.OnClickListener { dialog, which ->
                 sceneItem = _webscenes[which]
-                loadWebscene(sceneItem)
+                loadWebscene(sceneItem, context)
             }
 
             AlertDialog.Builder(context)
@@ -89,7 +89,7 @@ class PortalAGOL() {
         }
     }
 
-    private fun loadWebscene(currentScene: PortalItem?) {
+    private fun loadWebscene(currentScene: PortalItem?, context: android.content.Context) {
         try {
             if(currentScene != null) {
                 val scene = ArcGISScene(currentScene)
@@ -98,6 +98,7 @@ class PortalAGOL() {
                 scene.addDoneLoadingListener {
                     Layers = scene.operationalLayers
                     sceneCurrent = scene
+                    Toast.makeText(context, "Сцена загружена", Toast.LENGTH_LONG).show()
                 }
             }
         } catch (e: Exception) {
