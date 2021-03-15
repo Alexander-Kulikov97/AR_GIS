@@ -70,19 +70,11 @@ class MainActivity : AppCompatActivity() {
     private var haveAccelerometer = false
     private var haveMagnetometer = false
 
-    //private val mBookmarks: List<Bookmark3D> = ArrayList<Bookmark3D>()
-
-
-
-    // objects that implement Loadable must be class fields to prevent being garbage collected before loading
-    private var mMobileScenePackage: MobileScenePackage? = null
-
     private var ActionGpsLoc: FloatingActionButton? = null
     private var ActionTapSensorNavigation:FloatingActionButton? = null
     private var ActionTapArTerritory:FloatingActionButton? = null
     private var ActionLayers:FloatingActionButton? = null
     private var ActionOpen:FloatingActionButton? = null
-    private var ActionBookmarks:FloatingActionButton? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -451,12 +443,9 @@ class MainActivity : AppCompatActivity() {
 
         val scene = ArcGISScene(currentScene)
         scene.loadAsync()
-
         scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
 
-
             //scene.basemap = Basemap.createImagery()
-
             mArView!!.clippingDistance = 400.0 //1500.0 //5000.0 750
             // add the scene to the AR view's scene view
             //val test = scene?.basemap
@@ -464,7 +453,6 @@ class MainActivity : AppCompatActivity() {
 
             //mArView!!.elevation = 5F
             //mArView!!.sceneView.scene.basemap = Basemap.createTopographic()
-
             // set the base surface to fully opaque
             scene?.baseSurface!!.opacity = 0f
             // let the camera move below ground
@@ -520,13 +508,6 @@ class MainActivity : AppCompatActivity() {
      * @param plane detected by ArCore to which the scene should be pinned
      */
     private fun updateTranslationFactorAndOriginCamera(scene: ArcGISScene?, plane: Plane) {
-        // load the scene's first layer
-        //scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
-//        scene?.loadAsync()
-//        scene?.addDoneLoadingListener {
-//            var maxWidth = getMaxWidthLayer(scene?.operationalLayers)
-//            Toast.makeText(this, "maxWidth: $maxWidth", Toast.LENGTH_SHORT).show()
-//        }
 
         scene?.operationalLayers!![0]?.loadAsync()
         scene?.operationalLayers[0].addDoneLoadingListener {
@@ -548,11 +529,9 @@ class MainActivity : AppCompatActivity() {
                 GeodeticCurveType.GEODESIC
             )
 
-            val k = 1
-            // set the translation factor based on scene content width and desired physical size
+
             mArView!!.translationFactor = 800.0 //(2 * 1500.0) / 0.3 //width / plane.getExtentX()
 
-            //Toast.makeText(this, "translationFactor: " + width / plane.getExtentX(), Toast.LENGTH_SHORT).show()
             // find the center point of the scene content
             val centerPoint: Point = layerExtent.center
             // find the altitude of the surface at the center
@@ -581,18 +560,7 @@ class MainActivity : AppCompatActivity() {
         }
         //})
     }
-
-    private fun getMaxWidthLayer(layers: LayerList?): Double {
-        var max = 0.0
-        for(layer in layers!!) {
-            if(layer.fullExtent.width > max){
-                max = layer.fullExtent.width
-            }
-        }
-        return max
-    }
-
-
+    
     override fun onPause() {
         if (mArView != null) {
             mArView?.stopTracking()
