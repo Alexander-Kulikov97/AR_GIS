@@ -61,13 +61,22 @@
             />
 
         <com.github.clans.fab.FloatingActionButton
-            android:id="@+id/floatingActionTapArTerritory"
+            android:id="@+id/floatingActionGpsLoc"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:fab_label="AR Территория"
             app:fab_size="mini"
-            android:src="@drawable/sensor_navigation"
+            android:src="@drawable/gps_fixed"
             />
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/floatingActionTapArTerritory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="AR Территория без gps "
+            app:fab_size="mini"
+            android:src="@drawable/sensor_navigation"
+            app:showAsAction="ifRoom"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:id="@+id/floatingActionLayers"
