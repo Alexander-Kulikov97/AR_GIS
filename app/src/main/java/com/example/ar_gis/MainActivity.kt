@@ -1,18 +1,18 @@
 package com.example.ar_gis
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Service
 import android.content.DialogInterface
 import android.content.DialogInterface.OnMultiChoiceClickListener
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.os.Environment.getExternalStorageDirectory
 import android.preference.PreferenceManager
 import android.text.InputType
 import android.util.Log
@@ -23,8 +23,6 @@ import android.webkit.URLUtil
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.esri.arcgisruntime.concurrent.ListenableFuture
 import com.esri.arcgisruntime.geometry.*
 import com.esri.arcgisruntime.layers.Layer
@@ -38,14 +36,17 @@ import com.esri.arcgisruntime.portal.PortalItem
 import com.esri.arcgisruntime.portal.PortalUser
 import com.esri.arcgisruntime.security.AuthenticationManager
 import com.esri.arcgisruntime.security.DefaultAuthenticationChallengeHandler
-import com.esri.arcgisruntime.symbology.SceneSymbol
-import com.esri.arcgisruntime.symbology.SimpleMarkerSceneSymbol
+import com.esri.arcgisruntime.symbology.*
+import com.esri.arcgisruntime.tasks.geocode.LocatorTask
+import com.esri.arcgisruntime.tasks.geocode.ReverseGeocodeParameters
+import com.esri.arcgisruntime.tasks.networkanalysis.*
 import com.esri.arcgisruntime.toolkit.ar.ArLocationDataSource
 import com.esri.arcgisruntime.toolkit.ar.ArcGISArView
 import com.example.ar_gis.utility.PortalAGOL
 import com.github.clans.fab.FloatingActionButton
 import com.google.ar.core.Plane
 import java.util.*
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 
@@ -76,6 +77,17 @@ class MainActivity : AppCompatActivity() {
     private var ActionLayers:FloatingActionButton? = null
     private var ActionOpen:FloatingActionButton? = null
 
+    private var mMarkerGraphicsOverlay: GraphicsOverlay? = null
+    private var mRouteGraphicsOverlay: GraphicsOverlay? = null
+    private var mRouteTask: RouteTask? = null
+    private var mRouteParameters: RouteParameters? = null
+    //private val mMapPreviews: ArrayList<MapPreview> = ArrayList()
+    private var mMobileScenePackage: MobileScenePackage? = null
+    private var mMMPkTitle: String? = null
+    private var mLocatorTask: LocatorTask? = null
+    private val mCallout: Callout? = null
+    private var mReverseGeocodeParameters: ReverseGeocodeParameters? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -83,18 +95,227 @@ class MainActivity : AppCompatActivity() {
         mArView = findViewById(R.id.arView)
         mArView?.registerLifecycle(lifecycle)
 
+        mReverseGeocodeParameters = ReverseGeocodeParameters()
+        mReverseGeocodeParameters!!.setMaxResults(1)
+        mReverseGeocodeParameters!!.getResultAttributeNames().add("*")
+
+        // add route and marker overlays to map view
+        mMarkerGraphicsOverlay = GraphicsOverlay()
+        mRouteGraphicsOverlay = GraphicsOverlay()
+        mArView?.sceneView?.getGraphicsOverlays()?.add(mRouteGraphicsOverlay)
+        mArView?.sceneView?.getGraphicsOverlays()?.add(mMarkerGraphicsOverlay)
+
+        // add the map from the mobile map package to the MapView
+        loadMobileScenePackage("" + getExternalStorageDirectory() + getString(R.string.scenePath))
+
+        val point1: Point = Point(6229296.901368923, 7312296.581373852);
+        val point2: Point = Point(6229280.5453083, 7312244.386298041);
+
+        geoView(point1)
+        geoView(point2)
+
         ActionOpen = findViewById(R.id.floatingActionOpen) as FloatingActionButton
-        ActionTapSensorNavigation= findViewById(R.id.floatingActionTapSensorNavigation) as FloatingActionButton
+        //ActionTapSensorNavigation= findViewById(R.id.floatingActionTapSensorNavigation) as FloatingActionButton
         ActionLayers = findViewById(R.id.floatingActionLayers) as FloatingActionButton
-        ActionTapArTerritory = findViewById(R.id.floatingActionTapArTerritory) as FloatingActionButton
+        //ActionTapArTerritory = findViewById(R.id.floatingActionTapArTerritory) as FloatingActionButton
         ActionGpsLoc = findViewById(R.id.floatingActionGpsLoc) as FloatingActionButton
 
         ActionOpen!!.setOnClickListener { AuthAgol() }
-        ActionTapSensorNavigation!!.setOnClickListener { setupArView() }
+        //ActionTapSensorNavigation!!.setOnClickListener { setupArView() }
         ActionLayers!!.setOnClickListener { showLayers() }
-        ActionTapArTerritory!!.setOnClickListener { setupTerritoryArViewClick() }
-        ActionGpsLoc!!.setOnClickListener { setupTerritoryArView() }
+        //ActionTapArTerritory!!.setOnClickListener { setupTerritoryArViewClick() }
+        ActionGpsLoc!!.setOnClickListener {
+            val intent = Intent(
+                this@MainActivity,
+                MapActivity::class.java
+            )
+            val bundle = Bundle()
+            startActivity(intent, bundle)
+        }
 
+    }
+
+    private fun loadMobileScenePackage(path: String) {
+        // create the mobile map package
+        mMobileScenePackage = MobileScenePackage(path)
+        // load the mobile map package asynchronously
+        mMobileScenePackage?.loadAsync()
+        // add done listener which will load when package has maps
+        mMobileScenePackage?.addDoneLoadingListener {
+            // check load status and that the mobile map package has maps
+            if (mMobileScenePackage?.getLoadStatus() === LoadStatus.LOADED && !mMobileScenePackage?.scenes?.isEmpty()!!) {
+                mLocatorTask = mMobileScenePackage?.locatorTask
+                // default to display of first map in package
+                loadScene(0)
+            } else {
+                val error = "Mobile map package failed to load: " + mMobileScenePackage?.getLoadError()?.message
+                Log.e(TAG, error)
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun loadScene(mapNum: Int) {
+        val scene: ArcGISScene? = mMobileScenePackage?.scenes?.get(mapNum)
+        // check if the map contains transport networks
+        if (scene?.transportationNetworks?.isEmpty()!!) {
+            // only allow routing on map with transport networks
+            mRouteTask = null
+        } else {
+            mRouteTask = RouteTask(this, scene?.transportationNetworks[0])
+            try {
+                mRouteParameters = mRouteTask?.createDefaultParametersAsync()?.get()
+            } catch (e: ExecutionException) {
+                val error = "Error creating route task default parameters: " + e.message
+                Log.e(TAG, error)
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            } catch (e: InterruptedException) {
+                val error = "Error creating route task default parameters: " + e.message
+                Log.e(TAG, error)
+                Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            }
+        }
+        mArView?.sceneView?.scene = scene
+
+        mArView?.translationFactor = 1.0
+        mArView?.locationDataSource = locationDataSource
+        mArView?.clippingDistance = 400.0
+    }
+
+    private fun geoView(mapPoint: Point) {
+        if (mRouteTask != null || mLocatorTask != null) {
+            if (mRouteTask == null) {
+                mMarkerGraphicsOverlay!!.graphics.clear()
+            }
+            val graphic: Graphic
+            if (mRouteTask != null) {
+                val index = mMarkerGraphicsOverlay!!.graphics.size + 1
+                graphic = graphicForPoint(mapPoint, true, index)!!
+            } else {
+                graphic = graphicForPoint(mapPoint, false, null)!!
+            }
+            mMarkerGraphicsOverlay!!.graphics.add(graphic)
+            //reverseGeocode(mapPoint, graphic)
+            route()
+        }
+    }
+
+    private fun route() {
+        if (mMarkerGraphicsOverlay!!.graphics.size > 1 && mRouteParameters != null) {
+            // create stops for last and second to last graphic
+            val size = mMarkerGraphicsOverlay!!.graphics.size
+            val graphics: MutableList<Graphic> = ArrayList()
+            val lastGraphic = mMarkerGraphicsOverlay!!.graphics[size - 1]
+            graphics.add(lastGraphic)
+            val secondLastGraphic = mMarkerGraphicsOverlay!!.graphics[size - 2]
+            graphics.add(secondLastGraphic)
+            // add stops to the parameters
+            mRouteParameters!!.setStops(stopsForGraphics(graphics))
+            val routeResult: ListenableFuture<RouteResult> =
+                mRouteTask!!.solveRouteAsync(mRouteParameters)
+            routeResult.addDoneListener {
+                try {
+                    val route: Route = routeResult.get().getRoutes().get(0)
+                    val routeGraphic = Graphic(
+                        route.getRouteGeometry(),
+                        SimpleLineSymbol(
+                            SimpleLineSymbol.Style.SOLID, Color.BLUE, 5.0f
+                        )
+                    )
+                    mRouteGraphicsOverlay!!.graphics.add(routeGraphic)
+                } catch (e: InterruptedException) {
+                    val error = "Error getting route result: " + e.message
+                    Log.e(TAG, error)
+                    Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                    // if routing is interrupted, remove last graphic
+                    mMarkerGraphicsOverlay!!.graphics
+                        .removeAt(mMarkerGraphicsOverlay!!.graphics.size - 1)
+                } catch (e: ExecutionException) {
+                    val error = "Error getting route result: " + e.message
+                    Log.e(TAG, error)
+                    Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                    mMarkerGraphicsOverlay!!.graphics
+                        .removeAt(mMarkerGraphicsOverlay!!.graphics.size - 1)
+                }
+            }
+        }
+    }
+
+    private fun stopsForGraphics(graphics: List<Graphic>): List<Stop?>? {
+        val stops: MutableList<Stop> = ArrayList()
+        for (graphic in graphics) {
+            val stop = Stop(graphic.geometry as Point)
+            stops.add(stop)
+        }
+        return stops
+    }
+
+//    private fun reverseGeocode(point: Point, graphic: Graphic) {
+//        if (mLocatorTask != null) {
+//            val results: ListenableFuture<List<GeocodeResult>> =
+//                mLocatorTask!!.reverseGeocodeAsync(point, mReverseGeocodeParameters)
+//            results.addDoneListener {
+//                try {
+//                    val geocodeResult: List<GeocodeResult> = results.get()
+//                    if (geocodeResult.isEmpty()) {
+//                        // no result was found
+//                        mArView?.sceneView?.getCallout().dismiss()
+//                    } else {
+//                        graphic.attributes["Match_addr"] = geocodeResult[0].getLabel()
+//                        showCalloutForGraphic(graphic, point)
+//                    }
+//                } catch (e: InterruptedException) {
+//                    val error = "Error getting geocode result: " + e.message
+//                    Log.e(TAG, error)
+//                    Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+//                } catch (e: ExecutionException) {
+//                    val error = "Error getting geocode result: " + e.message
+//                    Log.e(TAG, error)
+//                    Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+//                }
+//            }
+//        }
+//    }
+
+    private fun graphicForPoint(point: Point, isIndexRequired: Boolean, index: Int?): Graphic? {
+        // make symbol composite if an index is required
+        val symbol: Symbol?
+        if (isIndexRequired && index != null) {
+            symbol = compositeSymbolForStopGraphic(simpleSymbolForStopGraphic()!!, index)
+        } else {
+            symbol = simpleSymbolForStopGraphic()
+        }
+        return Graphic(point, symbol)
+    }
+
+    private fun simpleSymbolForStopGraphic(): SimpleMarkerSymbol? {
+        val simpleMarkerSymbol = SimpleMarkerSymbol(
+            SimpleMarkerSymbol.Style.CIRCLE, Color.RED, 12f
+        )
+        simpleMarkerSymbol.setLeaderOffsetY(5f)
+        return simpleMarkerSymbol
+    }
+
+    /**
+     * Defines a composite symbol consisting of the SimpleMarkerSymbol and a text symbol
+     * representing the index of a stop in a route.
+     *
+     * @param simpleMarkerSymbol a SimpleMarkerSymbol which represents the background of the
+     * composite symbol
+     * @param index              number which corresponds to the stop number in a route
+     * @return the composite symbol
+     */
+    private fun compositeSymbolForStopGraphic(
+        simpleMarkerSymbol: SimpleMarkerSymbol,
+        index: Int
+    ): CompositeSymbol? {
+        val textSymbol = TextSymbol(
+            12f, index.toString(), Color.BLACK,
+            TextSymbol.HorizontalAlignment.CENTER, TextSymbol.VerticalAlignment.MIDDLE
+        )
+        val compositeSymbolList: MutableList<Symbol> = ArrayList()
+        compositeSymbolList.addAll(Arrays.asList(simpleMarkerSymbol, textSymbol))
+        return CompositeSymbol(compositeSymbolList)
     }
     
     private fun AuthAgol() {
@@ -203,7 +424,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupTerritoryArViewClick(){
         Toast.makeText(this, "Старт территории в Ar ", Toast.LENGTH_LONG).show()
         mArView?.sceneView?.setOnTouchListener(object :
-        DefaultSceneViewOnTouchListener(mArView?.sceneView) {
+            DefaultSceneViewOnTouchListener(mArView?.sceneView) {
             @SuppressLint("ClickableViewAccessibility")
             override fun onSingleTapConfirmed(motionEvent: MotionEvent?): Boolean {
                 motionEvent?.let {
@@ -213,14 +434,13 @@ class MainActivity : AppCompatActivity() {
                             0.25,
                             SceneSymbol.AnchorPosition.BOTTOM
                         )
-                        if(mArView!!.sceneView.scene == null) {
+                        if (mArView!!.sceneView.scene == null) {
                             val scene = ArcGISScene(mPortalAGOL.sceneItem)
                             scene.loadAsync()
                             scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
                                 mArView!!.sceneView.scene = scene
                             })
-                        }
-                        else{
+                        } else {
 
                         }
 
@@ -269,13 +489,15 @@ class MainActivity : AppCompatActivity() {
         this.haveAccelerometer = this.mSensorManager!!.registerListener(
             mSensorEventListener,
             this.mAccelerometer,
-            SensorManager.SENSOR_DELAY_GAME);
+            SensorManager.SENSOR_DELAY_GAME
+        );
 
         this.mMagnetometer = this.mSensorManager!!.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         this.haveMagnetometer = this.mSensorManager!!.registerListener(
             mSensorEventListener,
             this.mMagnetometer,
-            SensorManager.SENSOR_DELAY_GAME);
+            SensorManager.SENSOR_DELAY_GAME
+        );
 
         mArView!!.locationDataSource!!.addLocationChangedListener { locationChangedEvent: LocationDataSource.LocationChangedEvent ->
             val updatedLocation = locationChangedEvent.location.position
@@ -283,7 +505,8 @@ class MainActivity : AppCompatActivity() {
                 Point(updatedLocation.x, updatedLocation.y, mCurrentVerticalOffset),
                 mAzimuth,
                 mArView!!.originCamera.pitch,
-                mArView!!.originCamera.roll)
+                mArView!!.originCamera.roll
+            )
 
             Toast.makeText(
                 this,
