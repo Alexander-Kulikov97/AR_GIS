@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.DialogInterface
 import android.view.Gravity
 import android.widget.Toast
+import com.esri.arcgisruntime.layers.FeatureLayer
 import com.esri.arcgisruntime.layers.Layer
 import com.esri.arcgisruntime.loadable.LoadStatusChangedListener
 import com.esri.arcgisruntime.mapping.ArcGISScene

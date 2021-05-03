@@ -1,30 +1,32 @@
 package com.example.ar_gis
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Service
 import android.content.DialogInterface
 import android.content.DialogInterface.OnMultiChoiceClickListener
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment.getExternalStorageDirectory
 import android.preference.PreferenceManager
 import android.text.InputType
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.View
 import android.webkit.URLUtil
+import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.esri.arcgisruntime.concurrent.ListenableFuture
 import com.esri.arcgisruntime.geometry.*
 import com.esri.arcgisruntime.layers.Layer
@@ -40,10 +42,16 @@ import com.esri.arcgisruntime.security.AuthenticationManager
 import com.esri.arcgisruntime.security.DefaultAuthenticationChallengeHandler
 import com.esri.arcgisruntime.symbology.SceneSymbol
 import com.esri.arcgisruntime.symbology.SimpleMarkerSceneSymbol
+import com.esri.arcgisruntime.symbology.TextSymbol
 import com.esri.arcgisruntime.toolkit.ar.ArLocationDataSource
 import com.esri.arcgisruntime.toolkit.ar.ArcGISArView
+import com.example.ar_gis.utility.Floor
 import com.example.ar_gis.utility.PortalAGOL
+import com.example.ar_gis.utility.Rooms
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.github.clans.fab.FloatingActionButton
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.ar.core.Plane
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -70,11 +78,24 @@ class MainActivity : AppCompatActivity() {
     private var haveAccelerometer = false
     private var haveMagnetometer = false
 
-    private var ActionGpsLoc: FloatingActionButton? = null
-    private var ActionTapSensorNavigation:FloatingActionButton? = null
-    private var ActionTapArTerritory:FloatingActionButton? = null
+    private var ActionIndoor:FloatingActionButton? = null
     private var ActionLayers:FloatingActionButton? = null
     private var ActionOpen:FloatingActionButton? = null
+    private var ActionFile:FloatingActionButton? = null
+    private var patchFile: String = ""
+
+    private var bottomSheetBehavior: BottomSheetBehavior<View>? = null
+
+    private var mMapView: MapView? = null
+
+    private var mCallout: Callout? = null
+
+    private var mIsCalibrating: Boolean = false
+
+    private var floorList: MutableList<Floor> = arrayListOf()
+    private var roomsList: MutableList<Rooms> = arrayListOf()
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,18 +104,167 @@ class MainActivity : AppCompatActivity() {
         mArView = findViewById(R.id.arView)
         mArView?.registerLifecycle(lifecycle)
 
+        mMapView = findViewById(R.id.mapView)
+
+        val map = ArcGISMap(Basemap.createOpenStreetMap())
+
+        mMapView?.map = map
+
+        mMapView?.setViewpoint(Viewpoint(54.724999797983116, 55.940950887826475, 1000.0))
+
+        val jsonSelectedFile =  contentResolver.openInputStream(
+            Uri.parse(
+                "file://" + getExternalStorageDirectory() + getString(
+                    R.string.json_path
+                )
+            )
+        );
+        val inputAsString = jsonSelectedFile.bufferedReader().use { it.readText() }
+        val mapper = jacksonObjectMapper()
+
+        val list: MutableList<Floor> = mapper.readValue(inputAsString)
+        floorList.addAll(list)
+
+        val jsonRoomsFile =  contentResolver.openInputStream(
+            Uri.parse(
+                "file://" + getExternalStorageDirectory() + getString(
+                    R.string.rooms_path
+                )
+            )
+        );
+        val roomsString = jsonRoomsFile.bufferedReader().use { it.readText() }
+
+        val roomList: MutableList<Rooms> = mapper.readValue(roomsString)
+        roomsList.addAll(roomList)
+
         ActionOpen = findViewById(R.id.floatingActionOpen) as FloatingActionButton
-        ActionTapSensorNavigation= findViewById(R.id.floatingActionTapSensorNavigation) as FloatingActionButton
+        ActionIndoor= findViewById(R.id.floatingActionIndoor) as FloatingActionButton
         ActionLayers = findViewById(R.id.floatingActionLayers) as FloatingActionButton
-        ActionTapArTerritory = findViewById(R.id.floatingActionTapArTerritory) as FloatingActionButton
-        ActionGpsLoc = findViewById(R.id.floatingActionGpsLoc) as FloatingActionButton
+        ActionFile = findViewById(R.id.floatingActionFile) as FloatingActionButton
 
         ActionOpen!!.setOnClickListener { AuthAgol() }
-        ActionTapSensorNavigation!!.setOnClickListener { setupArView() }
+        ActionIndoor!!.setOnClickListener { startIndoorArView() }
         ActionLayers!!.setOnClickListener { showLayers() }
-        ActionTapArTerritory!!.setOnClickListener { setupTerritoryArViewClick() }
-        ActionGpsLoc!!.setOnClickListener { setupTerritoryArView() }
+        ActionFile!!.setOnClickListener { fileDialog() }
 
+
+        mMapView?.setOnTouchListener(object : DefaultMapViewOnTouchListener(this, mMapView) {
+            override fun onSingleTapConfirmed(motionEvent: MotionEvent): Boolean {
+
+                // get the point that was clicked and convert it to a point in map coordinates
+                val screenPoint = android.graphics.Point(
+                    Math.round(motionEvent.x),
+                    Math.round(motionEvent.y)
+                )
+                // create a map point from screen point
+                val mapPoint = mMapView.screenToLocation(screenPoint)
+                // convert to WGS84 for lat/lon format
+                val wgs84Point =
+                    GeometryEngine.project(mapPoint, SpatialReferences.getWgs84()) as Point
+
+                // create a textview for the callout
+                val calloutContent = TextView(applicationContext)
+                calloutContent.setTextColor(Color.BLACK)
+                calloutContent.setSingleLine()
+                // format coordinates to 4 decimal places
+                calloutContent.setText(
+                    "Высота: " + "м, Широта: " + java.lang.String.format(
+                        "%.4f",
+                        wgs84Point.y
+                    ).toString() + ", Долгота: " + java.lang.String.format("%.4f", wgs84Point.x)
+                )
+                var lat = wgs84Point.y
+                var long = wgs84Point.x
+                var oldCamera = mArView?.originCamera
+
+                val cam = Camera(
+                    lat,
+                    long,
+                    oldCamera?.location?.z!!,
+                    oldCamera.heading,
+                    oldCamera.pitch,
+                    oldCamera.roll
+                )
+                mArView!!.originCamera = cam
+
+                mArView!!.locationDataSource!!.addLocationChangedListener { locationChangedEvent: LocationDataSource.LocationChangedEvent ->
+                    val updatedLocation = locationChangedEvent.location.position
+                    mArView!!.originCamera = Camera(
+                        Point(updatedLocation.x, updatedLocation.y, mCurrentVerticalOffset),
+                        mAzimuth,
+                        mArView!!.originCamera.pitch,
+                        mArView!!.originCamera.roll
+                    )
+
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Азимут: " + mAzimuth.toString() + " Высота: " + mCurrentVerticalOffset.toString() + " Z величина сцены " + updatedLocation.z,
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
+                // get callout, set content and show
+                mCallout = mMapView.callout
+                mCallout?.setLocation(mapPoint)
+                mCallout?.setContent(calloutContent)
+                mCallout?.show()
+                //mCallout.dismiss();
+
+                // center on tapped point
+                mMapView.setViewpointCenterAsync(mapPoint)
+                return true
+            }
+        })
+    }
+
+    private fun loadMobileMapPackage(path: String) {
+        val mMobileScenePackage = MobileScenePackage(path)
+
+        mMobileScenePackage.loadAsync()
+        mMobileScenePackage.addDoneLoadingListener {
+            // if it loaded successfully and the mobile scene package contains a scene
+            if (mMobileScenePackage.getLoadStatus() === LoadStatus.LOADED && !mMobileScenePackage.getScenes().isEmpty()) {
+                // get a reference to the first scene in the mobile scene package, which is of a section of philadelphia
+                val scene: ArcGISScene = mMobileScenePackage.getScenes().get(0)
+                scene.basemap = Basemap.createOpenStreetMap()
+
+                mArView!!.sceneView.scene = scene
+
+                addElevationSource(mArView?.sceneView?.scene)
+                mArView?.locationDataSource = ArLocationDataSource(this)
+                getLocation()
+                mArView?.translationFactor = 1.0
+
+                mArView?.arSceneView?.planeRenderer?.isEnabled = false
+                mArView?.arSceneView?.planeRenderer?.isVisible = false
+
+                Toast.makeText(this, "Сцена загружена", Toast.LENGTH_LONG).show()
+
+            } else {
+                val error =
+                    "Failed to load mobile scene package: " + mMobileScenePackage.getLoadError().message
+                Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                Log.e(TAG, error)
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 111 && resultCode == RESULT_OK) {
+            patchFile = "" + getExternalStorageDirectory() + "/" + data?.data?.path?.substringAfter(
+                ':'
+            )
+            loadMobileMapPackage(patchFile)
+        }
+    }
+
+    private fun fileDialog() {
+        val intent = Intent()
+            .setType("*/*")
+            .setAction(Intent.ACTION_GET_CONTENT)
+
+        startActivityForResult(Intent.createChooser(intent, "Select a file"), 111)
     }
     
     private fun AuthAgol() {
@@ -178,8 +348,9 @@ class MainActivity : AppCompatActivity() {
                                         val folderItems = value[2000, TimeUnit.MILLISECONDS]
 
                                         for (folderItem in folderItems)
-                                            if (folderItem.type == PortalItem.Type.WEB_SCENE)
+                                            if (folderItem.type == PortalItem.Type.WEB_SCENE) {
                                                 mPortalAGOL.webScenes.add(folderItem)
+                                            }
 
                                     } catch (exc: java.lang.Exception) {
                                         Log.i(
@@ -199,66 +370,62 @@ class MainActivity : AppCompatActivity() {
                 })
             .show()
     }
+    
+    private fun startIndoorArView(){
 
-    private fun setupTerritoryArViewClick(){
-        Toast.makeText(this, "Старт территории в Ar ", Toast.LENGTH_LONG).show()
-        mArView?.sceneView?.setOnTouchListener(object :
-        DefaultSceneViewOnTouchListener(mArView?.sceneView) {
-            @SuppressLint("ClickableViewAccessibility")
-            override fun onSingleTapConfirmed(motionEvent: MotionEvent?): Boolean {
-                motionEvent?.let {
-                    with(android.graphics.Point(motionEvent.x.toInt(), motionEvent.y.toInt())) {
-                        val sphere = SimpleMarkerSceneSymbol.createSphere(
-                            Color.CYAN,
-                            0.25,
-                            SceneSymbol.AnchorPosition.BOTTOM
-                        )
-                        if(mArView!!.sceneView.scene == null) {
-                            val scene = ArcGISScene(mPortalAGOL.sceneItem)
-                            scene.loadAsync()
-                            scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
-                                mArView!!.sceneView.scene = scene
-                            })
-                        }
-                        else{
+        Toast.makeText(this, "Старт Indoor в Ar ", Toast.LENGTH_LONG).show()
 
-                        }
-
-                        addElevationSource(mArView?.sceneView?.scene)
-                        getLocation()
-                        mArView?.locationDataSource = locationDataSource
-                        mArView?.translationFactor = 1.0
-                        mArView?.clippingDistance = 1000.0
-
-                        mArView?.arScreenToLocation(this)?.let {
-                            val graphic = Graphic(it, sphere)
-                            sphereOverlay.graphics.add(graphic)
-                        }
-                        return true
-                    }
-                }
-                return false
-            }
-        })
-    }
-
-    private fun setupTerritoryArView(){
-
-        Toast.makeText(this, "Старт территории в Ar ", Toast.LENGTH_LONG).show()
-
-        if(mArView!!.sceneView.scene == null) {
-            val scene = ArcGISScene(mPortalAGOL.sceneItem)
-            scene.loadAsync()
-            scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
-                mArView!!.sceneView.scene = scene
-            })
+        val drapedFlatOverlay = GraphicsOverlay().apply {
+            sceneProperties.surfacePlacement = LayerSceneProperties.SurfacePlacement.ABSOLUTE
         }
+
+        roomsList.forEach { entry ->
+            val sceneRelatedPoint =
+                Point(entry.lng, entry.lat, entry.elevation)
+            val drapedFlatText = TextSymbol(
+                15f, entry.name, Color.RED, TextSymbol.HorizontalAlignment.LEFT,
+                TextSymbol.VerticalAlignment.TOP
+            ).apply {
+                offsetY = 20f
+            }
+            drapedFlatOverlay.
+                graphics.addAll(
+                arrayOf(
+                    Graphic(sceneRelatedPoint, drapedFlatText)
+                )
+            )
+
+        }
+
+        mArView!!.sceneView.scene = mPortalAGOL.sceneCurrent
+        
+        mArView!!.sceneView.graphicsOverlays.addAll(
+            arrayOf(
+                drapedFlatOverlay
+            )
+        )
+
+
 
         addElevationSource(mArView?.sceneView?.scene)
         mArView?.locationDataSource = ArLocationDataSource(this)
         getLocation()
         mArView?.translationFactor = 1.0
 
+        mArView?.arSceneView?.planeRenderer?.isEnabled = false
+        mArView?.arSceneView?.planeRenderer?.isVisible = false
+
+        mPortalAGOL.sceneCurrent?.baseSurface?.opacity = 0f
+
+        val calibrationButton: Button = findViewById(R.id.calibrateButton)
+        calibrationButton.setOnClickListener{
+            mIsCalibrating = !mIsCalibrating
+            if (mIsCalibrating) {
+                mPortalAGOL.sceneCurrent?.baseSurface?.opacity = 0.5f
+            } else {
+                mPortalAGOL.sceneCurrent?.baseSurface?.opacity = 0f
+            }
+        }
     }
 
     private fun getLocation(){
@@ -269,13 +436,15 @@ class MainActivity : AppCompatActivity() {
         this.haveAccelerometer = this.mSensorManager!!.registerListener(
             mSensorEventListener,
             this.mAccelerometer,
-            SensorManager.SENSOR_DELAY_GAME);
+            SensorManager.SENSOR_DELAY_GAME
+        );
 
         this.mMagnetometer = this.mSensorManager!!.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         this.haveMagnetometer = this.mSensorManager!!.registerListener(
             mSensorEventListener,
             this.mMagnetometer,
-            SensorManager.SENSOR_DELAY_GAME);
+            SensorManager.SENSOR_DELAY_GAME
+        );
 
         mArView!!.locationDataSource!!.addLocationChangedListener { locationChangedEvent: LocationDataSource.LocationChangedEvent ->
             val updatedLocation = locationChangedEvent.location.position
@@ -283,7 +452,8 @@ class MainActivity : AppCompatActivity() {
                 Point(updatedLocation.x, updatedLocation.y, mCurrentVerticalOffset),
                 mAzimuth,
                 mArView!!.originCamera.pitch,
-                mArView!!.originCamera.roll)
+                mArView!!.originCamera.roll
+            )
 
             Toast.makeText(
                 this,
@@ -339,63 +509,8 @@ class MainActivity : AppCompatActivity() {
         surface.isEnabled = true
         surface.backgroundGrid.color = Color.TRANSPARENT
         surface.backgroundGrid.gridLineColor = Color.TRANSPARENT
-        surface.navigationConstraint = NavigationConstraint.NONE
+        surface.navigationConstraint = NavigationConstraint.STAY_ABOVE
         scene.baseSurface = surface
-    }
-
-    private fun setupArView() {
-
-        // show simple instructions to the user. Refer to the README for more details
-        Toast.makeText(this, R.string.camera_instruction_message, Toast.LENGTH_LONG).show()
-        mArView?.sceneView?.setOnTouchListener(object :
-            DefaultSceneViewOnTouchListener(mArView?.sceneView) {
-            override fun onSingleTapConfirmed(motionEvent: MotionEvent): Boolean {
-                // результат нажатия на экран
-                val hitResults = mArView?.arSceneView!!.arFrame!!.hitTest(motionEvent)
-                // проверка, распознается ли точка касания как плоскость ARCore
-                if (!hitResults.isEmpty() && hitResults[0].trackable is Plane) {
-
-                    val plane: Plane = hitResults[0].trackable as Plane
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Обнаруженная плоскость с шириной: " + plane.getExtentX(),
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    val screenPoint = android.graphics.Point(
-                        Math.round(motionEvent.x),
-                        Math.round(motionEvent.y)
-                    )
-
-                    if (mArView?.setInitialTransformationMatrix(screenPoint)!!) {
-                        // the scene hasn't been configured
-                        //if (!mHasConfiguredScene) {
-                        loadSceneFromAGOL(mPortalAGOL.sceneItem, plane)
-
-//                        } else if (mArView?.sceneView?.scene != null) {
-//                            // use information from the scene to determine the origin camera and translation factor
-//                            updateTranslationFactorAndOriginCamera(
-//                                mArView?.sceneView?.scene!!,
-//                                plane
-//                            )
-//                        }
-                    }
-                } else {
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.not_plane_error),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    Log.e(TAG, getString(R.string.not_plane_error))
-                }
-                return super.onSingleTapConfirmed(motionEvent)
-            }
-
-            // disable pinch zooming
-            override fun onScale(scaleGestureDetector: ScaleGestureDetector): Boolean {
-                return true
-            }
-        })
     }
 
 //    private fun requestPermissions() {
@@ -432,37 +547,6 @@ class MainActivity : AppCompatActivity() {
 //        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 //    }
 
-    /**
-     * Load the mobile scene package and get the first (and only) scene inside it. Set it to the ArView's SceneView and
-     * set the base surface to opaque and remove any navigation constraint, thus allowing the user to look at a scene
-     * from below. Then call updateTranslationFactorAndOriginCamera with the plane detected by ArCore.
-     *
-     * @param plane detected by ArCore based on a tap from the user. The loaded scene will be pinned on this plane.
-     */
-    private fun loadSceneFromAGOL(currentScene: PortalItem?, plane: Plane){
-
-        val scene = ArcGISScene(currentScene)
-        scene.loadAsync()
-        scene.addLoadStatusChangedListener(LoadStatusChangedListener { loadStatusChangedEvent ->
-
-            //scene.basemap = Basemap.createImagery()
-            mArView!!.clippingDistance = 400.0 //1500.0 //5000.0 750
-            // add the scene to the AR view's scene view
-            //val test = scene?.basemap
-            mArView!!.sceneView.scene = scene
-
-            //mArView!!.elevation = 5F
-            //mArView!!.sceneView.scene.basemap = Basemap.createTopographic()
-            // set the base surface to fully opaque
-            scene?.baseSurface!!.opacity = 0f
-            // let the camera move below ground
-            scene?.baseSurface!!.navigationConstraint = NavigationConstraint.NONE
-            mHasConfiguredScene = true
-            // set translation factor and origin camera for scene placement in AR
-            updateTranslationFactorAndOriginCamera(scene, plane)
-        })
-    }
-
     private fun showLayers() {
         val adb: AlertDialog.Builder = AlertDialog.Builder(this@MainActivity)
         val iLayers: Int? = mArView?.sceneView?.getScene()?.getOperationalLayers()?.size
@@ -498,69 +582,6 @@ class MainActivity : AppCompatActivity() {
             lyr.isVisible = b
         }
 
-
-    /**
-     * Load the scene's first layer and calculate its geographical width. Use the scene's width and ArCore's assessment
-     * of the plane's width to set the AR view's translation transformation factor. Use the center of the scene, corrected
-     * for elevation, as the origin camera's look at point.
-     *
-     * @param scene to display
-     * @param plane detected by ArCore to which the scene should be pinned
-     */
-    private fun updateTranslationFactorAndOriginCamera(scene: ArcGISScene?, plane: Plane) {
-
-        scene?.operationalLayers!![0]?.loadAsync()
-        scene?.operationalLayers[0].addDoneLoadingListener {
-
-            // get the scene extent
-            val layerExtent: Envelope = scene.operationalLayers[0].fullExtent
-            scene.operationalLayers[0].fullExtent.width
-
-            Toast.makeText(
-                this,
-                "fullExtent.width: " + scene.operationalLayers[0].fullExtent.width,
-                Toast.LENGTH_SHORT
-            ).show()
-
-            // calculate the width of the layer content in meters
-            val width = GeometryEngine.lengthGeodetic(
-                layerExtent,
-                LinearUnit(LinearUnitId.METERS),
-                GeodeticCurveType.GEODESIC
-            )
-
-
-            mArView!!.translationFactor = 800.0 //(2 * 1500.0) / 0.3 //width / plane.getExtentX()
-
-            // find the center point of the scene content
-            val centerPoint: Point = layerExtent.center
-            // find the altitude of the surface at the center
-            val elevationFuture: ListenableFuture<Double> = mArView!!.sceneView.scene.baseSurface.getElevationAsync(
-                centerPoint
-            )
-
-            elevationFuture.addDoneListener {
-                try {
-                    val elevation: Double = elevationFuture.get()
-                    Toast.makeText(this, "elevation: $elevation", Toast.LENGTH_SHORT).show()
-                    // create a new origin camera looking at the bottom center of the scene
-                    //mArView!!.setViewpointCamera()
-                    mArView!!.originCamera = Camera(
-                        Point(
-                            centerPoint.x,
-                            centerPoint.y,
-                            8.813445091247559
-                        ), 0.0, 90.0, 0.0
-                    )
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error getting elevation at point: " + e.message)
-                }
-            }
-            mArView!!.locationDataSource = null
-        }
-        //})
-    }
-    
     override fun onPause() {
         if (mArView != null) {
             mArView?.stopTracking()

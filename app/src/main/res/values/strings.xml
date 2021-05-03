@@ -6,4 +6,9 @@
     <string name="tabletop_map_permission_denied">Camera and read external storage permissions are both required for this app to run!</string>
     <string name="tb_btn_layers">Слои</string>
     <string name="unnamed_layer">[unnamed layer]</string>
+    <string name="headerBottomSheet">Карта</string>
+    <string name="services_url">https://services.arcgis.com/qd8XVTTaaOW9YvXw/arcgis/rest/services/</string>
+    <string name="feature_url">/FeatureServer</string>
+    <string name="json_path">/ArcGIS/floor.JSON</string>
+    <string name="rooms_path">/ArcGIS/rooms.JSON</string>
 </resources>

@@ -17,6 +17,12 @@
         android:layout_height="match_parent"
         tools:context=".MainActivity" />
 
+    <Button
+        android:id="@+id/calibrateButton"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:text="Вкл/Выкл карту"/>
+
 
     <com.github.clans.fab.FloatingActionMenu
         android:layout_width="wrap_content"
@@ -34,49 +40,23 @@
         app:menu_showShadow="true"
         >
 
-<!--        <com.github.clans.fab.FloatingActionButton-->
-<!--            android:id="@+id/floatingActionBookmarks"-->
-<!--            android:layout_width="wrap_content"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            app:fab_label="Закладки"-->
-<!--            app:fab_size="mini"-->
-<!--            android:src="@drawable/bookmarks"-->
-<!--            />-->
-<!--        <com.github.clans.fab.FloatingActionButton-->
-<!--            android:id="@+id/floatingActionGpsLoc"-->
-<!--            android:layout_width="wrap_content"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            app:fab_label="GPS"-->
-<!--            app:fab_size="mini"-->
-<!--            android:src="@drawable/gps_fixed"-->
-<!--            app:showAsAction="ifRoom"/>-->
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/floatingActionFile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Открыть файл"
+            app:fab_size="mini"
+            android:src="@drawable/bookmarks"
+            />
 
         <com.github.clans.fab.FloatingActionButton
-            android:id="@+id/floatingActionTapSensorNavigation"
+            android:id="@+id/floatingActionIndoor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:fab_label="Стол AR"
             app:fab_size="mini"
-            android:src="@drawable/ic_touch_action"
-            />
-
-        <com.github.clans.fab.FloatingActionButton
-            android:id="@+id/floatingActionGpsLoc"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:fab_label="AR Территория"
-            app:fab_size="mini"
             android:src="@drawable/gps_fixed"
             />
-
-        <com.github.clans.fab.FloatingActionButton
-            android:id="@+id/floatingActionTapArTerritory"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:fab_label="AR Территория без gps "
-            app:fab_size="mini"
-            android:src="@drawable/sensor_navigation"
-            app:showAsAction="ifRoom"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:id="@+id/floatingActionLayers"
@@ -97,5 +77,7 @@
             />
 
     </com.github.clans.fab.FloatingActionMenu>
+
+    <include layout="@layout/bottom_sheet" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
