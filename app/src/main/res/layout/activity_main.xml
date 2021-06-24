@@ -17,11 +17,24 @@
         android:layout_height="match_parent"
         tools:context=".MainActivity" />
 
-    <Button
-        android:id="@+id/calibrateButton"
-        android:layout_width="wrap_content"
-        android:layout_height="40dp"
-        android:text="Вкл/Выкл карту"/>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical" >
+
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/addressSearchView"
+            android:background="@color/colorWhiteSemiTransparent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:queryHint="@string/address_search_hint"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="5dp"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp">
+        </androidx.appcompat.widget.SearchView>
+    </LinearLayout>
+
 
 
     <com.github.clans.fab.FloatingActionMenu
@@ -40,6 +53,17 @@
         app:menu_showShadow="true"
         >
 
+
+
+        <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/btnScan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Qr код"
+            app:fab_size="mini"
+            android:src="@drawable/bookmarks"
+            />
+
         <com.github.clans.fab.FloatingActionButton
             android:id="@+id/floatingActionFile"
             android:layout_width="wrap_content"
@@ -50,10 +74,19 @@
             />
 
         <com.github.clans.fab.FloatingActionButton
+            android:id="@+id/calibrateButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fab_label="Настройки"
+            app:fab_size="mini"
+            android:src="@drawable/gps_fixed"
+            />
+
+        <com.github.clans.fab.FloatingActionButton
             android:id="@+id/floatingActionIndoor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:fab_label="Стол AR"
+            app:fab_label="AR навигация"
             app:fab_size="mini"
             android:src="@drawable/gps_fixed"
             />
@@ -77,6 +110,13 @@
             />
 
     </com.github.clans.fab.FloatingActionMenu>
+
+    <include
+        layout="@layout/layout_calibration_controls"
+        app:layout_constraintBottom_toTopOf="@+id/calibrateButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:visibility="gone"/>
 
     <include layout="@layout/bottom_sheet" />
 

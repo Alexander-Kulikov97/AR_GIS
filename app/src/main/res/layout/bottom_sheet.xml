@@ -2,6 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/bottomSheet"
     android:layout_width="match_parent"
     android:layout_height="500dp"
@@ -31,19 +32,16 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="parent"  />
+        app:layout_constraintTop_toBottomOf="parent"  >
 
-    <!--    <androidx.appcompat.widget.AppCompatTextView-->
-<!--        android:id="@+id/tvSubtitle"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="match_parent"-->
-<!--        android:layout_margin="16sp"-->
-<!--        android:text="ntrcn"-->
-<!--        android:textSize="16sp"-->
-<!--        app:layout_constraintBottom_toBottomOf="parent"-->
-<!--        app:layout_constraintEnd_toEndOf="parent"-->
-<!--        app:layout_constraintStart_toStartOf="parent"-->
-<!--        app:layout_constraintTop_toBottomOf="@+id/tvTitle" />-->
+        <Button
+            android:id="@+id/FloorMenu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="60dp"
+            android:onClick="MenuFloor"
+            android:text="Этаж" />
 
+    </com.esri.arcgisruntime.mapping.view.MapView>
 
 </androidx.constraintlayout.widget.ConstraintLayout >

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Display scene in tabletop AR</string>
+    <string name="app_name">Indoor AR</string>
     <string name="philadelphia_mobile_scene_package_path">/ArcGIS/Samples/ScenePackage/philadelphia.mspk</string>
     <string name="camera_instruction_message">Перемещайте камеру вперед и назад. Когда когда поверхность будет обнаружена, нажмите на поверхность, чтобы разместить сцену</string>
     <string name="not_plane_error">ArCore doesn\'t recognize this point as a plane.</string>
@@ -11,4 +11,19 @@
     <string name="feature_url">/FeatureServer</string>
     <string name="json_path">/ArcGIS/floor.JSON</string>
     <string name="rooms_path">/ArcGIS/rooms.JSON</string>
+    <string name="address_search_hint">Поиск</string>
+
+    <string name="showing_code_in_fragment">Showing code in fragment</string>
+    <string name="scan_qr_code">SCAN QR CODE</string>
+    <string name="name">Name</string>
+    <string name="empty">---</string>
+    <string name="site_name">Site Name</string>
+    <string name="scan_a_code">Scan a QR Code</string>
+    <string name="result_not_found">Result Not Found</string>
+    <string name="show_scanner_from_fragment">Show Scanner From Fragment</string>
+
+    <string name="calibrate_button">Calibrate</string>
+    <string name="calibration_start_message">Adjust calibration before starting</string>
+    <string name="altitude_slider_label">Высота</string>
+    <string name="heading_slider_label">Азимут</string>
 </resources>

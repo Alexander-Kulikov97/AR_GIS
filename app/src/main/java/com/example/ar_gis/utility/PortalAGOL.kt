@@ -24,8 +24,18 @@ class PortalAGOL() {
 
     private var _scene: ArcGISScene? = null;
 
+    private var layerRoute: MutableList<Route> = ArrayList()
+
     // для хранения текущей сцены
     private var _sceneItem: PortalItem? = null
+
+    var LayerRoute : MutableList<Route>
+    get() = layerRoute
+    private set(value) {
+        if(value != null){
+            layerRoute = value
+        }
+    }
 
     var Layers : MutableList<Layer>
         get() = _layer
@@ -97,7 +107,16 @@ class PortalAGOL() {
                 scene.loadAsync()
 
                 scene.addDoneLoadingListener {
-                    Layers = scene.operationalLayers
+                    //Layers = scene.operationalLayers
+                    scene.operationalLayers.forEach{ layer ->
+                        if(layer.name.contains("route")){
+                            layerRoute.add(Route(layer, layer.name.split("_")[1]))
+                        }
+                        else {
+                            Layers.add(layer)
+                        }
+                    }
+
                     sceneCurrent = scene
                     Toast.makeText(context, "Сцена загружена", Toast.LENGTH_LONG).show()
                 }
